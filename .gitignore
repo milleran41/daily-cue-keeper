@@ -12,6 +12,18 @@ dist
 dist-ssr
 *.local
 
+# Env files
+.env
+.env.*
+!.env.example
+
+# Vite/Workbox dev artifacts
+dev-dist
+
+# IDE
+.vs
+src/.vs
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
