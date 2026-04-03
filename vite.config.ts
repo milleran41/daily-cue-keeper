@@ -46,10 +46,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom', 'react-router-dom', 'framer-motion', '@supabase/supabase-js'],
-          'ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', 'lucide-react'],
-        },
+        manualChunks: undefined,
       },
     },
     chunkSizeWarningLimit: 1000,
