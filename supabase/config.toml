@@ -1,0 +1,4 @@
+project_id = "ifntdeftlwtolgixzahm"
+
+[functions.notes-chat]
+verify_jwt = false
