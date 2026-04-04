@@ -11,7 +11,7 @@ export const useTasks = () => {
   const { user, profile } = useAuth();
   const triggeredTasks = useRef<Set<string>>(new Set());
 
-  const withTimeout = useCallback(async <T,>(promise: Promise<T>, ms = 15000): Promise<T> => {
+  const withTimeout = useCallback(async <T,>(promise: Promise<T>, ms = 8000): Promise<T> => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([
@@ -34,7 +34,7 @@ export const useTasks = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('datetime', { ascending: true }),
-      15000
+      8000
     );
 
     if (error) {
@@ -70,7 +70,7 @@ export const useTasks = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('completed_at', { ascending: false }),
-      15000
+      8000
     );
 
     if (data) {
@@ -171,7 +171,7 @@ export const useTasks = () => {
         })
         .select('*')
         .single(),
-      15000
+      8000
     );
 
     if (error) {
@@ -203,7 +203,7 @@ export const useTasks = () => {
 
     const { error } = await withTimeout(
       supabase.from('tasks').update(dbUpdates).eq('id', id),
-      15000
+      8000
     );
     if (error) {
       console.error('Error updating task:', error);
@@ -216,7 +216,7 @@ export const useTasks = () => {
     console.log('Deleting task:', id);
     const { error } = await withTimeout(
       supabase.from('tasks').delete().eq('id', id),
-      15000
+      8000
     );
     if (error) {
       console.error('Error deleting task:', error);

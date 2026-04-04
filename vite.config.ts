@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'sounds/*.mp3'],
       devOptions: {
-        enabled: true
+        enabled: mode === 'development',
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3}'],
