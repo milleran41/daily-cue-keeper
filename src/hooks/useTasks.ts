@@ -11,14 +11,31 @@ export const useTasks = () => {
   const { user, profile } = useAuth();
   const triggeredTasks = useRef<Set<string>>(new Set());
 
+  const withTimeout = useCallback(async <T,>(promise: Promise<T>, ms = 15000): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Request timed out')), ms);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }, []);
+
   // Load tasks from Supabase
   const loadTasks = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('datetime', { ascending: true });
+    const { data, error } = await withTimeout(
+      supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('datetime', { ascending: true }),
+      15000
+    );
 
     if (error) {
       console.error('Error loading tasks:', error);
@@ -43,15 +60,18 @@ export const useTasks = () => {
         updatedAt: new Date(t.updated_at),
       })));
     }
-  }, [user]);
+  }, [user, withTimeout]);
 
   const loadHistory = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('task_history')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('completed_at', { ascending: false });
+    const { data } = await withTimeout(
+      supabase
+        .from('task_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('completed_at', { ascending: false }),
+      15000
+    );
 
     if (data) {
       setHistory(data.map((t: any) => ({
@@ -68,7 +88,7 @@ export const useTasks = () => {
         updatedAt: new Date(t.created_at),
       })));
     }
-  }, [user]);
+  }, [user, withTimeout]);
 
   useEffect(() => {
     loadTasks();
@@ -135,17 +155,24 @@ export const useTasks = () => {
     datetime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
     console.log('Inserting task for user:', user.id);
-    const { data: inserted, error } = await supabase.from('tasks').insert({
-      user_id: user.id,
-      name: data.name,
-      description: data.description || null,
-      datetime: datetime.toISOString(),
-      repeat_type: data.repeatType,
-      repeat_interval: data.repeatInterval || null,
-      custom_reminders: data.customReminders || null,
-      category: data.category,
-      sound: data.sound,
-    }).select('*').single();
+    const { data: inserted, error } = await withTimeout(
+      supabase
+        .from('tasks')
+        .insert({
+          user_id: user.id,
+          name: data.name,
+          description: data.description || null,
+          datetime: datetime.toISOString(),
+          repeat_type: data.repeatType,
+          repeat_interval: data.repeatInterval || null,
+          custom_reminders: data.customReminders || null,
+          category: data.category,
+          sound: data.sound,
+        })
+        .select('*')
+        .single(),
+      15000
+    );
 
     if (error) {
       console.error('Error inserting task:', error);
@@ -155,7 +182,7 @@ export const useTasks = () => {
     console.log('Task inserted successfully:', inserted.id);
     await loadTasks();
     return inserted;
-  }, [user, loadTasks]);
+  }, [user, loadTasks, withTimeout]);
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     console.log('Updating task:', id);
@@ -174,23 +201,29 @@ export const useTasks = () => {
     if (updates.completed !== undefined) dbUpdates.completed = updates.completed;
     if (updates.completedAt !== undefined) dbUpdates.completed_at = updates.completedAt instanceof Date ? updates.completedAt.toISOString() : updates.completedAt;
 
-    const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
+    const { error } = await withTimeout(
+      supabase.from('tasks').update(dbUpdates).eq('id', id),
+      15000
+    );
     if (error) {
       console.error('Error updating task:', error);
       throw error;
     }
     await loadTasks();
-  }, [loadTasks]);
+  }, [loadTasks, withTimeout]);
 
   const deleteTask = useCallback(async (id: string) => {
     console.log('Deleting task:', id);
-    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    const { error } = await withTimeout(
+      supabase.from('tasks').delete().eq('id', id),
+      15000
+    );
     if (error) {
       console.error('Error deleting task:', error);
       throw error;
     }
     await loadTasks();
-  }, [loadTasks]);
+  }, [loadTasks, withTimeout]);
 
   const completeTask = useCallback(async (id: string) => {
     if (!user) return;

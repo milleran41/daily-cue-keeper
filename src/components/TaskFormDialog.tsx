@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 
 interface TaskFormDialogProps {
   onClose: () => void;
-  onSubmit: (data: TaskFormData) => void;
+  onSubmit: (data: TaskFormData) => Promise<void>;
   initialData?: Partial<TaskFormData>;
 }
 
@@ -46,9 +46,12 @@ export const TaskFormDialog = ({ onClose, onSubmit, initialData }: TaskFormDialo
   });
 
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const mountedRef = useRef(true);
 
   // Initialize form only once on mount since component unmounts on close
   useEffect(() => {
+    mountedRef.current = true;
     setForm({
       name: initialData?.name || '',
       description: initialData?.description || '',
@@ -61,6 +64,9 @@ export const TaskFormDialog = ({ onClose, onSubmit, initialData }: TaskFormDialo
       sound: initialData?.sound || profile?.notification_sound || 'bell',
     });
     setMissingFields([]);
+    return () => {
+      mountedRef.current = false;
+    };
   }, [initialData, profile?.notification_sound]);
 
   const set = (field: keyof TaskFormData, value: any) => {
@@ -73,10 +79,16 @@ export const TaskFormDialog = ({ onClose, onSubmit, initialData }: TaskFormDialo
     toast({ title: t('soundSaved') });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    onSubmit(form);
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSubmit(form);
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
   };
 
   const fieldHighlight = (field: string) =>
@@ -353,9 +365,14 @@ export const TaskFormDialog = ({ onClose, onSubmit, initialData }: TaskFormDialo
               {/* Submit */}
               <Button
                 type="submit"
+                disabled={saving}
                 className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-bold text-base shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
               >
-                <Save className="w-4 h-4 mr-2" />
+                {saving ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
                 {t('save')}
               </Button>
             </form>

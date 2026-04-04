@@ -12,10 +12,29 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('Supabase credentials missing. Check your .env file.');
 }
 
+const fetchWithTimeout: typeof fetch = async (input, init) => {
+  const hasSignal = !!init?.signal;
+  const controller = hasSignal ? null : new AbortController();
+  const timeoutMs = 15000;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: init?.signal ?? controller?.signal,
+    });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: {
+    fetch: fetchWithTimeout,
+  },
   auth: {
     storage: localStorage,
     persistSession: true,

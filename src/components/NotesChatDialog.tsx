@@ -127,9 +127,7 @@ export const NotesChatDialog = ({ open, onClose, onSaveAll, onSaveSelected }: No
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
-      let streamDone = false;
-
-      while (!streamDone) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });

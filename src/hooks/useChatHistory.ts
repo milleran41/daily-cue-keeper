@@ -21,7 +21,9 @@ export const useChatHistory = () => {
     if (saved) {
       try {
         setSessions(JSON.parse(saved));
-      } catch {}
+      } catch (e) {
+        setSessions([]);
+      }
     }
   }, []);
 
