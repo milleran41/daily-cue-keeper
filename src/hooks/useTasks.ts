@@ -129,7 +129,7 @@ export const useTasks = () => {
   }, [tasks, sendNotification, profile?.notification_sound, playSound]);
 
   const addTask = useCallback(async (data: TaskFormData) => {
-    if (!user) return;
+    if (!user) throw new Error('Not authenticated');
     const [hours, minutes] = data.time.split(':');
     const datetime = new Date(`${data.date}T00:00:00`);
     datetime.setHours(parseInt(hours), parseInt(minutes), 0, 0);

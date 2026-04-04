@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { createElement, createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { NotificationSound } from '@/types/task';
@@ -10,7 +10,18 @@ export interface Profile {
   notification_sound: NotificationSound;
 }
 
-export const useAuth = () => {
+type AuthState = {
+  user: User | null;
+  profile: Profile | null;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  session: Session | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthState | null>(null);
+
+const useAuthInternal = (): AuthState => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -187,4 +198,15 @@ export const useAuth = () => {
   }, []);
 
   return { user, profile, updateProfile, session, loading, signOut };
+};
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const value = useAuthInternal();
+  return createElement(AuthContext.Provider, { value }, children);
+};
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (ctx) return ctx;
+  return useAuthInternal();
 };
