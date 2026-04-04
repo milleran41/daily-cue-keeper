@@ -115,9 +115,5 @@ export const useNotifications = () => {
     }
   }, [requestPermission, playSound]);
 
-  useEffect(() => {
-    requestPermission();
-  }, [requestPermission]);
-
   return { sendNotification, requestPermission, playSound };
 };

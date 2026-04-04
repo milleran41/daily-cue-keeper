@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BottomNav, TabId } from '@/components/BottomNav';
@@ -16,6 +16,15 @@ import { useNotes } from '@/hooks/useNotes';
 import { useAuth } from '@/hooks/useAuth';
 import { Task, TaskFormData } from '@/types/task';
 import { Plus, ArrowLeft } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const { t } = useLanguage();
@@ -35,8 +44,30 @@ const Index = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
   );
+  const [showOnboardingNotifications, setShowOnboardingNotifications] = useState(false);
 
   const hasNoteAlert = hasActiveReminders();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
+    const dismissed = localStorage.getItem('onboarding_notifications_dismissed') === '1';
+    const installed =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true;
+
+    if (installed && Notification.permission !== 'granted' && !dismissed) {
+      setShowOnboardingNotifications(true);
+    }
+
+    const onInstalled = () => {
+      if (Notification.permission !== 'granted') {
+        setShowOnboardingNotifications(true);
+      }
+    };
+    window.addEventListener('appinstalled', onInstalled);
+    return () => window.removeEventListener('appinstalled', onInstalled);
+  }, []);
 
   const handleSubmit = useCallback(async (data: TaskFormData) => {
     try {
@@ -124,6 +155,29 @@ const Index = () => {
     }
   }, [requestPermission, toast, t]);
 
+  const handleEnableNotifications = useCallback(async () => {
+    try {
+      const granted = await requestPermission();
+      setNotificationsEnabled(granted);
+      if (!granted) {
+        localStorage.setItem('onboarding_notifications_dismissed', '1');
+      }
+      setShowOnboardingNotifications(false);
+      toast({
+        title: t('enableNotifications'),
+        description: granted ? t('notifGranted') : t('notifDenied'),
+      });
+    } catch (e) {
+      localStorage.setItem('onboarding_notifications_dismissed', '1');
+      setShowOnboardingNotifications(false);
+      toast({
+        title: t('enableNotifications'),
+        description: t('notifUnsupported'),
+        variant: 'destructive',
+      });
+    }
+  }, [requestPermission, toast, t]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -181,6 +235,37 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20 safe-top">
+      <AlertDialog
+        open={showOnboardingNotifications}
+        onOpenChange={(open) => {
+          setShowOnboardingNotifications(open);
+          if (!open) localStorage.setItem('onboarding_notifications_dismissed', '1');
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('enableNotifications')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Чтобы напоминания приходили даже когда приложение закрыто, включите уведомления для этого сайта.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                localStorage.setItem('onboarding_notifications_dismissed', '1');
+                setShowOnboardingNotifications(false);
+              }}
+            >
+              {t('cancel')}
+            </Button>
+            <Button onClick={handleEnableNotifications}>
+              {t('enableNotifications')}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="max-w-lg mx-auto px-4 pt-6">
         <div className="flex items-center gap-3 mb-6">
           {activeTab !== 'today' && (
