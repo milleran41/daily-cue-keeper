@@ -115,13 +115,13 @@ const useAuthInternal = (): AuthState => {
   useEffect(() => {
     console.log("Auth hook initialized");
     
-    // Safety timeout: force end loading after 5 seconds no matter what
+    // Safety timeout: force end loading after a while no matter what
     const safetyTimer = setTimeout(() => {
       if (loading) {
         console.warn("Auth loading safety timeout reached");
         setLoading(false);
       }
-    }, 5000);
+    }, 20000);
 
     // Set up listener BEFORE getting session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

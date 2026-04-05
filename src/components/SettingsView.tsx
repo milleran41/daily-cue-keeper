@@ -79,6 +79,21 @@ export const SettingsView = ({
     localStorage.setItem('history_cleanup_days', val);
   };
 
+  const handleResetApp = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } finally {
+      window.location.reload();
+    }
+  };
+
   const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
     { value: 'light', icon: Sun, label: t('themeLight') },
     { value: 'dark', icon: Moon, label: t('themeDark') },
@@ -183,6 +198,25 @@ export const SettingsView = ({
               </p>
             </div>
           )}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection icon={Trash2} title={language === 'ru' ? 'Диагностика' : 'Troubleshooting'}>
+        <div className="space-y-3">
+          <div className="p-3 bg-secondary/50 rounded-xl border border-border/50">
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {language === 'ru'
+                ? 'Если в Chrome задачи не сохраняются, чаще всего мешают расширения (например, Browser Control/переводчик). Попробуйте инкогнито или отключите расширения.'
+                : 'If tasks do not save in Chrome, browser extensions often interfere. Try incognito or disable extensions.'}
+            </p>
+          </div>
+          <Button
+            onClick={handleResetApp}
+            variant="outline"
+            className="w-full rounded-2xl"
+          >
+            {language === 'ru' ? 'Сбросить кэш и перезагрузить' : 'Reset cache and reload'}
+          </Button>
         </div>
       </SettingsSection>
 
