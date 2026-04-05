@@ -137,6 +137,7 @@ const useAuthInternal = (): AuthState => {
         }
         
         setLoading(false);
+        clearTimeout(safetyTimer);
 
         // Create profile on first sign in
         if (event === 'SIGNED_IN' && session?.user) {
