@@ -7,9 +7,9 @@ import { useAuth } from './useAuth';
 export const useTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [history, setHistory] = useState<Task[]>([]);
-  const { sendNotification, playSound } = useNotifications();
+  const { sendNotification } = useNotifications();
   const { user, profile } = useAuth();
-  const triggeredTasks = useRef<Set<string>>(new Set());
+  const notifiedForDatetime = useRef<Map<string, string>>(new Map());
 
   // Load tasks from Supabase
   const loadTasks = useCallback(async () => {
@@ -105,13 +105,11 @@ export const useTasks = () => {
         const diff = nowTime - taskTime;
         
         // Trigger if current time is within 1 minute AFTER the task time
-        if (diff >= 0 && diff < 60000 && !triggeredTasks.current.has(task.id)) {
-          triggeredTasks.current.add(task.id);
+        const taskDatetimeIso = (task.datetime instanceof Date ? task.datetime : new Date(task.datetime)).toISOString();
+        if (diff >= 0 && diff < 60000 && notifiedForDatetime.current.get(task.id) !== taskDatetimeIso) {
+          notifiedForDatetime.current.set(task.id, taskDatetimeIso);
           
           const soundToPlay = task.sound !== 'none' ? task.sound : (profile?.notification_sound || 'bell');
-          
-          // Play sound directly
-          playSound(soundToPlay);
           
           sendNotification(task.name, {
             body: task.description || 'Время выполнить задачу!',
@@ -126,7 +124,16 @@ export const useTasks = () => {
     const interval = setInterval(check, 10000);
     check();
     return () => clearInterval(interval);
-  }, [tasks, sendNotification, profile?.notification_sound, playSound]);
+  }, [tasks, sendNotification, profile?.notification_sound]);
+
+  useEffect(() => {
+    const ids = new Set(tasks.map(t => t.id));
+    for (const id of notifiedForDatetime.current.keys()) {
+      if (!ids.has(id)) {
+        notifiedForDatetime.current.delete(id);
+      }
+    }
+  }, [tasks]);
 
   const addTask = useCallback(async (data: TaskFormData) => {
     if (!user) throw new Error('Not authenticated');
