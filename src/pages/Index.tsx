@@ -95,9 +95,16 @@ const Index = () => {
       setEditingTask(null);
     } catch (error: any) {
       console.error('Error saving task:', error);
+      const raw = (error?.message || String(error || '')).toString();
+      const isLock =
+        raw.toLowerCase().includes('lock') ||
+        raw.toLowerCase().includes('steal') ||
+        raw.toLowerCase().includes('aborterror');
       toast({ 
         title: 'Error saving task', 
-        description: error.message || 'Check your internet connection or database status',
+        description: isLock
+          ? 'Закройте другие окна/вкладки приложения и перезагрузите страницу. Затем попробуйте снова.'
+          : (error.message || 'Check your internet connection or database status'),
         variant: 'destructive' 
       });
     }

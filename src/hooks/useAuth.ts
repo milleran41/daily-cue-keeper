@@ -1,4 +1,4 @@
-import { createElement, createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createElement, createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { NotificationSound } from '@/types/task';
@@ -26,8 +26,9 @@ const useAuthInternal = (): AuthState => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const profileLoadSeq = useRef(0);
 
-  const loadProfile = async (userId: string) => {
+  const loadProfile = async (userId: string, sessionUser: User | null, requestId: number) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -39,16 +40,18 @@ const useAuthInternal = (): AuthState => {
       
       if (error) {
         console.error('Error selecting profile:', error);
+        if (profileLoadSeq.current !== requestId) return;
         setProfile({
           id: userId,
-          display_name: user?.user_metadata?.full_name || user?.email || null,
-          avatar_url: user?.user_metadata?.avatar_url || null,
+          display_name: sessionUser?.user_metadata?.full_name || sessionUser?.email || null,
+          avatar_url: sessionUser?.user_metadata?.avatar_url || null,
           notification_sound: localSound || 'bell'
         });
         return;
       }
 
       if (data) {
+        if (profileLoadSeq.current !== requestId) return;
         setProfile({
           id: data.id,
           display_name: data.display_name,
@@ -70,6 +73,7 @@ const useAuthInternal = (): AuthState => {
           .single();
         
         if (newProfile) {
+          if (profileLoadSeq.current !== requestId) return;
           setProfile({
             id: newProfile.id,
             display_name: newProfile.display_name,
@@ -123,59 +127,43 @@ const useAuthInternal = (): AuthState => {
       }
     }, 20000);
 
+    let initialSessionHandled = false;
+
     // Set up listener BEFORE getting session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, nextSession) => {
         console.log("Auth state change:", event);
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (event === 'INITIAL_SESSION') {
+          initialSessionHandled = true;
+        }
+
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
         
-        if (session?.user) {
-          await loadProfile(session.user.id);
+        if (nextSession?.user) {
+          const reqId = ++profileLoadSeq.current;
+          void loadProfile(nextSession.user.id, nextSession.user, reqId);
         } else {
           setProfile(null);
         }
         
         setLoading(false);
         clearTimeout(safetyTimer);
-
-        // Create profile on first sign in
-        if (event === 'SIGNED_IN' && session?.user) {
-          setTimeout(async () => {
-            try {
-              const { data: existing } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('id', session.user.id)
-                .maybeSingle();
-
-              if (!existing) {
-                await supabase.from('profiles').insert({
-                  id: session.user.id,
-                  display_name: session.user.user_metadata?.full_name || session.user.email,
-                  avatar_url: session.user.user_metadata?.avatar_url || null,
-                });
-                await loadProfile(session.user.id);
-              }
-            } catch (e) {
-              console.error('Profile auto-creation error:', e);
-            }
-          }, 0);
-        }
       }
     );
 
-    // Get initial session
-    const getInitialSession = async () => {
+    const fallbackTimer = setTimeout(async () => {
+      if (initialSessionHandled) return;
       try {
         console.log("Fetching initial session...");
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log("Initial session fetched:", session ? "Session exists" : "No session");
+        const { data: { session: fallbackSession } } = await supabase.auth.getSession();
+        console.log("Initial session fetched:", fallbackSession ? "Session exists" : "No session");
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadProfile(session.user.id);
+        setSession(fallbackSession);
+        setUser(fallbackSession?.user ?? null);
+        if (fallbackSession?.user) {
+          const reqId = ++profileLoadSeq.current;
+          void loadProfile(fallbackSession.user.id, fallbackSession.user, reqId);
         }
       } catch (err) {
         console.error("Initial session error:", err);
@@ -184,13 +172,12 @@ const useAuthInternal = (): AuthState => {
         setLoading(false);
         clearTimeout(safetyTimer);
       }
-    };
-
-    getInitialSession();
+    }, 1000);
 
     return () => {
       subscription.unsubscribe();
       clearTimeout(safetyTimer);
+      clearTimeout(fallbackTimer);
     };
   }, []);
 
